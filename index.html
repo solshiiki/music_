@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundCanvas - Интерактивный аудиовизуальный генератор</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+        
+        header {
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto 1.5rem auto;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding: 0 1rem;
+        }
+        
+        button, select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover, select:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        select {
+            appearance: none;
+            padding-right: 2rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            background-size: 1rem;
+        }
+        
+        .canvas-container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        #gridCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        #visualizerCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+        
+        .info-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1.5rem auto;
+            max-width: 800px;
+            width: 90%;
+        }
+        
+        .info-title {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: #c2e9fb;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: auto;
+        }
+        
+        .pulse {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .canvas-container {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SoundCanvas</h1>
+        <p class="subtitle">Создавайте музыкальные узоры, касаясь сетки. Каждая ячейка генерирует уникальный звук, образуя последовательность при проигрывании.</p>
+    </header>
+    
+    <div class="controls">
+        <button id="playButton">▶ Воспроизвести</button>
+        <button id="clearButton">🗑️ Очистить</button>
+        <button id="randomButton">🎲 Случайный узор</button>
+        <select id="scaleSelect">
+            <option value="major">Мажорная гамма</option>
+            <option value="minor">Минорная гамма</option>
+            <option value="pentatonic">Пентатоника</option>
+            <option value="blues">Блюз</option>
+            <option value="chromatic">Хроматическая</option>
+        </select>
+        <select id="speedSelect">
+            <option value="1">Быстро</option>
+            <option value="2" selected>Средне</option>
+            <option value="3">Медленно</option>
+        </select>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="gridCanvas"></canvas>
+        <canvas id="visualizerCanvas"></canvas>
+    </div>
+    
+    <div class="info-panel">
+        <div class="info-title">Как использовать:</div>
+        <ul>
+            <li>Нажимайте на ячейки для создания звукового узора</li>
+            <li>Нажмите "Воспроизвести" для запуска последовательности</li>
+            <li>Меняйте гаммы для разного звучания</li>
+            <li>Экспериментируйте со скоростью воспроизведения</li>
+        </ul>
+    </div>
+    
+    <footer>
+        &copy; 2025 SoundCanvas by Comfortable Cat
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Инициализация переменных
+            const gridCanvas = document.getElementById('gridCanvas');
+            const visualizerCanvas = document.getElementById('visualizerCanvas');
+            const gridCtx = gridCanvas.getContext('2d');
+            const visualizerCtx = visualizerCanvas.getContext('2d');
+            const playButton = document.getElementById('playButton');
+            const clearButton = document.getElementById('clearButton');
+            const randomButton = document.getElementById('randomButton');
+            const scaleSelect = document.getElementById('scaleSelect');
+            const speedSelect = document.getElementById('speedSelect');
+            
+            // Настройка размеров канвасов
+            function setupCanvases() {
+                const container = document.querySelector('.canvas-container');
+                const size = container.clientWidth;
+                gridCanvas.width = size;
+                gridCanvas.height = size;
+                visualizerCanvas.width = size;
+                visualizerCanvas.height = size;
+            }
+            
+            // Вызов настройки при загрузке и изменении размера
+            setupCanvases();
+            window.addEventListener('resize', setupCanvases);
+            
+            // Константы для сетки
+            const GRID_SIZE = 8; // 8x8 сетка
+            const grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+            let isPlaying = false;
+            let currentColumn = 0;
+            let playInterval;
+            
+            // Аудио-контекст
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioContext();
+            
+            // Музыкальные гаммы (частоты нот)
+            const scales = {
+                major: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25],
+                minor: [261.63, 293.66, 311.13, 349.23, 392.00, 415.30, 466.16, 523.25],
+                pentatonic: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25],
+                blues: [261.63, 293.66, 311.13, 329.63, 349.23, 392.00, 466.16, 523.25],
+                chromatic: [261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00]
+            };
+            
+            // Цвета для ячеек
+            const cellColors = [
+                '#FF5252', '#FF4081', '#E040FB', '#7C4DFF', 
+                '#536DFE', '#448AFF', '#40C4FF', '#18FFFF',
+                '#64FFDA', '#69F0AE', '#B2FF59', '#EEFF41', 
+                '#FFFF00', '#FFD740', '#FFAB40', '#FF6E40'
+            ];
+            
+            // Рисует основную сетку
+            function drawGrid() {
+                const cellSize = gridCanvas.width / GRID_SIZE;
+                
+                // Очистка сетки
+                gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+                
+                // Рисование фона
+                gridCtx.fillStyle = '#0f0f1a';
+                gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+                
+                // Рисование ячеек
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        const colorIndex = (x * 3 + y * 2) % cellColors.length;
+                        
+                        if (grid[y][x]) {
+                            // Активная ячейка
+                            gridCtx.fillStyle = cellColors[colorIndex];
+                            gridCtx.beginPath();
+                            gridCtx.roundRect(
+                                x * cellSize + 2, 
+                                y * cellSize + 2, 
+                                cellSize - 4, 
+                                cellSize - 4, 
+                                10
+                            );
+                            gridCtx.fill();
+                            
+                            // Блик
+                            gridCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                            gridCtx.beginPath();
+                            gridCtx.ellipse(
+                                x * cellSize + cellSize / 2,
+                                y * cellSize + cellSize / 3,
+                                cellSize / 6,
+                                cellSize / 10,
+                                0,
+                                0,
+                                Math.PI * 2
+                            );
+                            gridCtx.fill();
+                        } else {
+                            // Неактивная ячейка
+                            gridCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                            gridCtx.beginPath();
+                            gridCtx.roundRect(
+                                x * cellSize + 2, 
+                                y * cellSize + 2, 
+                                cellSize - 4, 
+                                cellSize - 4, 
+                                10
+                            );
+                            gridCtx.fill();
+                        }
+                    }
+                }
+                
+                // Если воспроизводится, отмечаем текущую колонку
+                if (isPlaying) {
+                    gridCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    gridCtx.fillRect(
+                        currentColumn * cellSize, 
+                        0, 
+                        cellSize, 
+                        gridCanvas.height
+                    );
+                }
+            }
+            
+            // Обработка клика по канвасу
+            gridCanvas.addEventListener('click', (e) => {
+                const rect = gridCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const cellSize = gridCanvas.width / GRID_SIZE;
+                const gridX = Math.floor(x / cellSize);
+                const gridY = Math.floor(y / cellSize);
+                
+                if (gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE) {
+                    grid[gridY][gridX] = !grid[gridY][gridX];
+                    
+                    // Если ячейка активирована, воспроизведем звук
+                    if (grid[gridY][gridX]) {
+                        playTone(gridY);
+                        
+                        // Визуальный эффект при активации
+                        visualizeNote(gridX, gridY);
+                    }
+                    
+                    drawGrid();
+                }
+            });
+            
+            // Воспроизводит звук для определенной строки
+            function playTone(row) {
+                const scale = scales[scaleSelect.value];
+                const frequency = scale[row];
+                
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                // Выбираем тип осциллятора в зависимости от ряда
+                const oscillatorTypes = ['sine', 'square', 'sawtooth', 'triangle'];
+                oscillator.type = oscillatorTypes[row % oscillatorTypes.length];
+                
+                oscillator.frequency.value = frequency;
+                gainNode.gain.value = 0;
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                
+                // Плавная атака
+                gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.01);
+                // Плавное затухание
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+                
+                // Остановка через 2 секунды
+                setTimeout(() => {
+                    oscillator.stop();
+                }, 2000);
+                
+                return oscillator;
+            }
+            
+            // Создает визуальный эффект при воспроизведении ноты
+            function visualizeNote(x, y) {
+                const cellSize = visualizerCanvas.width / GRID_SIZE;
+                const centerX = x * cellSize + cellSize / 2;
+                const centerY = y * cellSize + cellSize / 2;
+                
+                // Очистка только нужной области
+                visualizerCtx.clearRect(
+                    x * cellSize, 
+                    y * cellSize, 
+                    cellSize, 
+                    cellSize
+                );
+                
+                // Круговая волна
+                const colorIndex = (x * 3 + y * 2) % cellColors.length;
+                const color = cellColors[colorIndex];
+                
+                // Создаем анимацию
+                let radius = 10;
+                let alpha = 0.7;
+                
+                function drawRipple() {
+                    visualizerCtx.beginPath();
+                    visualizerCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    visualizerCtx.fillStyle = `rgba(${hexToRgb(color)}, ${alpha})`;
+                    visualizerCtx.fill();
+                    
+                    radius += 3;
+                    alpha -= 0.03;
+                    
+                    if (alpha > 0) {
+                        requestAnimationFrame(drawRipple);
+                    } else {
+                        visualizerCtx.clearRect(
+                            x * cellSize, 
+                            y * cellSize, 
+                            cellSize, 
+                            cellSize
+                        );
+                    }
+                }
+                
+                drawRipple();
+            }
+            
+            // Преобразует HEX-цвет в RGB
+            function hexToRgb(hex) {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? 
+                    `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+                    '255, 255, 255';
+            }
+            
+            // Очистка визуализатора
+            function clearVisualizer() {
+                visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            }
+            
+            // Начать воспроизведение
+            function startPlayback() {
+                if (isPlaying) return;
+                
+                isPlaying = true;
+                currentColumn = 0;
+                audioCtx.resume();
+                playButton.textContent = "⏸ Пауза";
+                playButton.classList.add('pulse');
+                
+                // Скорость зависит от выбора пользователя
+                const speed = parseInt(speedSelect.value);
+                const interval = 200 * speed;
+                
+                playInterval = setInterval(() => {
+                    // Проигрываем активные ячейки в текущей колонке
+                    for (let row = 0; row < GRID_SIZE; row++) {
+                        if (grid[row][currentColumn]) {
+                            playTone(row);
+                            visualizeNote(currentColumn, row);
+                        }
+                    }
+                    
+                    // Перерисовываем сетку
+                    drawGrid();
+                    
+                    // Переходим к следующей колонке
+                    currentColumn = (currentColumn + 1) % GRID_SIZE;
+                }, interval);
+            }
+            
+            // Остановить воспроизведение
+            function stopPlayback() {
+                isPlaying = false;
+                clearInterval(playInterval);
+                playButton.textContent = "▶ Воспроизвести";
+                playButton.classList.remove('pulse');
+                drawGrid();
+            }
+            
+            // Обработчики кнопок
+            playButton.addEventListener('click', () => {
+                if (isPlaying) {
+                    stopPlayback();
+                } else {
+                    startPlayback();
+                }
+            });
+            
+            clearButton.addEventListener('click', () => {
+                stopPlayback();
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        grid[y][x] = false;
+                    }
+                }
+                clearVisualizer();
+                drawGrid();
+            });
+            
+            randomButton.addEventListener('click', () => {
+                stopPlayback();
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        // Примерно 30% шанс активации ячейки
+                        grid[y][x] = Math.random() < 0.3;
+                    }
+                }
+                drawGrid();
+            });
+            
+            // Обработчики селекторов
+            scaleSelect.addEventListener('change', () => {
+                // При смене гаммы просто перерисовываем сетку
+                drawGrid();
+            });
+            
+            speedSelect.addEventListener('change', () => {
+                // При смене скорости перезапускаем воспроизведение если оно активно
+                if (isPlaying) {
+                    stopPlayback();
+                    startPlayback();
+                }
+            });
+            
+            // Первоначальная отрисовка сетки
+            drawGrid();
+            
+            // Добавляем немного случайных точек для демонстрации
+            for (let i = 0; i < 10; i++) {
+                const x = Math.floor(Math.random() * GRID_SIZE);
+                const y = Math.floor(Math.random() * GRID_SIZE);
+                grid[y][x] = true;
+            }
+            drawGrid();
+        });
+    </script>
+</body>
+<
